@@ -60,11 +60,11 @@ ChangeWorklist <-
 #' @param randommethod Which random method you want to use?
 #' "no", "position" or "injection". Default is "no".
 #' @param samplenumber Sample number.
-#' @param replication Replication times.
-#' @param QCstep QC step.
-#' @param conditionQCnumber Condition QC number.
-#' @param validationQCstep Validation QC step.
-#' @param testmixstep Test mixture step.
+#' @param replication Replication times. Default: 1.
+#' @param QCstep Numeric. QC step. Default: 8. If users don't want to insert validationQC, please set it as 0.
+#' @param conditionQCnumber Numeric. Condition QC number. Default: 10.
+#' @param validationQCstep Numeric. Validation QC step. Default: 40. If users don't want to insert validationQC, please set it as 0.
+#' @param testmixstep Test mixture step. Default: 40. If users don't want to insert validationQC, please set it as 0.
 #' @param injectionfrom Injection order from which? Default is 1.
 #' @param user Default is "other".
 #' @param dir Directory.
@@ -86,7 +86,7 @@ setGeneric(name = "getWorklist",
                           injectionfrom = 1,
                           user = "other",
                           dir = "D:\\MassHunter\\Data\\SXT\\"){
-             browser()
+             # browser()
 
              instrument <- match.arg(instrument)
              randommethod <- match.arg(randommethod)
@@ -98,9 +98,9 @@ setGeneric(name = "getWorklist",
              file <- dir()
 
              if (instrument == "AB") {dir = ""}
-               x <- read.csv(file[file == "batch.design.csv"],
-                             check.names = FALSE,
-                             stringsAsFactors = FALSE)
+             x <- read.csv(file[file == "batch.design.csv"],
+                           check.names = FALSE,
+                           stringsAsFactors = FALSE)
 
              # --------------------------------------------------------------------------
              options(warn = 0)
@@ -339,7 +339,10 @@ setGeneric(name = "getWorklist",
                  x <- x[, -c(4, 5, 6)]
                }
              }
-             #now x column 1 is Sample Name, column 2 is Sample Position
+
+             # now x column 1 is Sample Name, column 2 is Sample Position
+             # generate blank and QC information
+
              if (instrument == "Agilent") {
                Blank <- c("Blank", "Vial1")
                Test.mix <- matrix(c("Test.mix", "Vial2"), ncol = 2)
@@ -354,18 +357,21 @@ setGeneric(name = "getWorklist",
                Blank.QC <- rbind(Blank, QC)
              }
 
-             #insert Blank and QC
-             x <-
-               lapply(seq(1, nrow(x), by = QCstep), function(y)
-                 if (y + QCstep - 1 <= (samplenumber * replication)) {
-                   x[y:(y + QCstep - 1),]
-                 }
-                 else {
-                   x[y:nrow(x),]
-                 })
+             # insert Blank and QC
+             x <- lapply(seq(1, nrow(x), by = QCstep), function(y){
+               if (y + QCstep - 1 <= (samplenumber * replication)) {
+                 x[y:(y + QCstep - 1),]
+               }
+               else {
+                 x[y:nrow(x),]
+               }
+             })
              colnames(Blank.QC) <- colnames(x[[1]])
-             x <- lapply(x, function(y)
-               rbind(Blank.QC, y))
+
+             x <- lapply(x, function(y) {
+               rbind(Blank.QC, y)
+             })
+
              ###
              x2 <- NULL
              for (i in seq_along(x)) {
@@ -380,15 +386,17 @@ setGeneric(name = "getWorklist",
 
              #insert Test.mix
              if (testmixstep == 0) {
-               x = x
+               x <- x
              } else {
                x <-
-                 lapply(seq(1, nrow(x), by = testmixstep), function(y)
+                 lapply(seq(1, nrow(x), by = testmixstep), function(y){
                    if (y + testmixstep - 1 <= nrow(x)) {
                      x[y:(y + testmixstep - 1),]
                    } else {
                      x[y:nrow(x),]
-                   })
+                   }
+                 })
+
 
                colnames(Test.mix) <- colnames(x[[1]])
                x <- lapply(x, function(y)
